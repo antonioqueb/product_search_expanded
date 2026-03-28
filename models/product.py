@@ -9,7 +9,8 @@ class ProductTemplate(models.Model):
 
     @api.model
     def _name_search(self, name='', domain=None, operator='ilike', limit=None, order=None):
-        if limit is None or limit == 8:
+        # Always override to expanded limit unless explicitly set higher
+        if limit is None or limit <= 8:
             limit = EXPANDED_SEARCH_LIMIT
         return super()._name_search(
             name=name, domain=domain, operator=operator,
@@ -22,7 +23,7 @@ class ProductProduct(models.Model):
 
     @api.model
     def _name_search(self, name='', domain=None, operator='ilike', limit=None, order=None):
-        if limit is None or limit == 8:
+        if limit is None or limit <= 8:
             limit = EXPANDED_SEARCH_LIMIT
         return super()._name_search(
             name=name, domain=domain, operator=operator,

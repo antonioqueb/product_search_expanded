@@ -3,47 +3,36 @@
 import { Many2XAutocomplete } from "@web/views/fields/many2x_autocomplete";
 import { patch } from "@web/core/utils/patch";
 
-/**
- * Increase the number of results shown in the Many2One/Many2Many dropdown.
- *
- * In Odoo 19, Many2XAutocomplete.loadOptionsSource calls
- * orm.call(resModel, "name_search", ...) with a limit parameter.
- * We patch the sources getter and loadOptionsSource to increase that limit.
- *
- * The backend _name_search override in product.py handles the server-side,
- * this ensures the frontend also requests/displays more results.
- */
-
 const EXPANDED_LIMIT = 80;
 
 patch(Many2XAutocomplete.prototype, {
     /**
-     * Patch sources to increase optionLimit so the autocomplete dropdown
-     * shows more items before truncating.
+     * Override sources to increase the optionLimit so more items are displayed
+     * in the dropdown instead of being truncated.
      */
     get sources() {
-        const parentSources = super.sources;
-        return parentSources.map((source) => {
-            const patched = Object.assign({}, source);
-            if (patched.optionLimit !== undefined) {
-                patched.optionLimit = EXPANDED_LIMIT;
-            }
-            return patched;
-        });
+        const sources = super.sources;
+        return sources.map((s) => ({
+            ...s,
+            optionLimit: EXPANDED_LIMIT,
+        }));
     },
 
     /**
-     * Patch loadOptionsSource to request more results from the server.
+     * Override to ensure the RPC call to name_search uses a higher limit.
+     * In Odoo 19, loadOptionsSource builds the name_search call using
+     * this.props.searchLimit or a default of 8.
      */
     async loadOptionsSource(request) {
-        // Temporarily override searchLimit prop if it exists
-        if (this.props && typeof this.props.searchLimit === "number") {
-            const orig = this.props.searchLimit;
-            this.props.searchLimit = EXPANDED_LIMIT;
-            const result = await super.loadOptionsSource(request);
-            this.props.searchLimit = orig;
-            return result;
+        // Save and override searchLimit
+        const origLimit = this.props.searchLimit;
+        this.props.searchLimit = EXPANDED_LIMIT;
+        try {
+            return await super.loadOptionsSource(request);
+        } finally {
+            this.props.searchLimit = origLimit;
         }
-        return super.loadOptionsSource(request);
     },
 });
+
+console.log("[ProductSearchExpanded] Many2XAutocomplete patched — limit:", EXPANDED_LIMIT);
